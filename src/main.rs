@@ -22,13 +22,10 @@ fn main() {
 
     let sound_file = args.get(1).unwrap();
 
-    match play_sound(sound_file) {
-        Ok(_) => {
-            println!("Sound played successfully!");
-            std::thread::sleep(std::time::Duration::from_secs(5));
-        }
-        Err(error) => {
-            println!("Error playing sound: {}", error);
-        }
+    if let Err(e) = play_sound(sound_file) {
+        println!("Error playing sound: {}", e);
+        return;
     }
+
+    println!("Sound played successfully!");
 }
