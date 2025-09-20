@@ -84,6 +84,7 @@ impl SoundPlayer {
             file: sound_file.to_string(),
             source: e,
         })?;
+
         let buf_reader = BufReader::new(file);
 
         let sink = rodio::play(&self.stream_handle.mixer(), buf_reader).map_err(|e| {

@@ -1,3 +1,5 @@
+use crate::order::Order;
+
 pub enum Command {
     Play { song_name: String },
     Stop,
@@ -13,22 +15,15 @@ pub enum CommandParseError {
     UnknownCommand,
 }
 
-impl TryFrom<&str> for Command {
+impl TryFrom<&Order> for Command {
     type Error = CommandParseError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let parts: Vec<&str> = s.trim().split_whitespace().collect();
-
-        let command_name = match parts.get(0) {
-            Some(name) => name.to_lowercase(),
-            None => return Err(CommandParseError::UnknownCommand),
-        };
-
-        match command_name.as_str() {
+    fn try_from(order: &Order) -> Result<Self, Self::Error> {
+        match order.command_name.to_lowercase().as_str() {
             "play" => {
-                if parts.len() >= 2 {
+                if let Some(song_name) = order.parameters.get(0) {
                     Ok(Command::Play {
-                        song_name: parts[1].to_owned(),
+                        song_name: song_name.clone(),
                     })
                 } else {
                     Err(CommandParseError::InvalidParameters)
@@ -38,7 +33,7 @@ impl TryFrom<&str> for Command {
             "pause" => Ok(Command::Pause),
             "resume" => Ok(Command::Resume),
             "seek" => {
-                if let Some(pos_str) = parts.get(1) {
+                if let Some(pos_str) = order.parameters.get(0) {
                     if let Ok(position) = pos_str.parse::<u64>() {
                         Ok(Command::Seek { position })
                     } else {
@@ -49,8 +44,8 @@ impl TryFrom<&str> for Command {
                 }
             }
             "volume" => {
-                if let Some(vol_str) = parts.get(1) {
-                    if let Ok(level) = vol_str.parse::<f32>() {
+                if let Some(level_str) = order.parameters.get(0) {
+                    if let Ok(level) = level_str.parse::<f32>() {
                         Ok(Command::Volume { level })
                     } else {
                         Err(CommandParseError::InvalidParameters)
@@ -60,7 +55,7 @@ impl TryFrom<&str> for Command {
                 }
             }
             "speed" => {
-                if let Some(factor_str) = parts.get(1) {
+                if let Some(factor_str) = order.parameters.get(0) {
                     if let Ok(factor) = factor_str.parse::<f32>() {
                         Ok(Command::Speed { factor })
                     } else {

@@ -1,11 +1,12 @@
-use crate::{command::*, sound_player::*};
+use crate::{
+    command::*,
+    order::{self, Order},
+    sound_player::*,
+};
 use log::{error, info, warn};
-
-pub struct WebSocket {}
 
 pub struct SoundPlayerManager {
     sound_player: SoundPlayer,
-    web_socket: WebSocket,
 }
 
 #[derive(Debug)]
@@ -13,21 +14,16 @@ pub enum SoundPlayerManagerError {
     InitFail,
 }
 
-// TODO: Add websockets and don't close the program until given the order to exit
 impl SoundPlayerManager {
     pub fn new() -> Result<Self, SoundPlayerManagerError> {
         let sound_player = match SoundPlayer::new() {
             Ok(sp) => sp,
             Err(e) => {
-                eprintln!("Failed to initialize SoundPlayer: {}", e);
+                error!("Failed to initialize SoundPlayer: {}", e);
                 return Err(SoundPlayerManagerError::InitFail);
             }
         };
-        let web_socket = WebSocket {};
-        Ok(Self {
-            sound_player,
-            web_socket,
-        })
+        Ok(Self { sound_player })
     }
 
     pub fn execute_command(&mut self, command: Command) -> SoundPlayerResult<()> {
@@ -43,54 +39,76 @@ impl SoundPlayerManager {
         Ok(())
     }
 
-    pub fn process_command(&mut self, command_str: &str) {
-        let cmd = match Command::try_from(command_str) {
+    pub fn process_order(&mut self, order: Order) -> String {
+        let cmd = match Command::try_from(&order) {
             Ok(c) => c,
-            Err(e) => {
-                match e {
-                    CommandParseError::InvalidParameters => {
-                        error!("Invalid parameters in command: '{}'", command_str);
-                    }
-                    CommandParseError::UnknownCommand => {
-                        error!("Unknown command: '{}'", command_str);
-                    }
+            Err(e) => match e {
+                CommandParseError::InvalidParameters => {
+                    error!(
+                        "Invalid parameters in command: '{}'",
+                        order.parameters.join(" ")
+                    );
+                    return format!(
+                        "Invalid parameters in command: '{}'",
+                        order.parameters.join(" ")
+                    );
                 }
-                return;
-            }
+                CommandParseError::UnknownCommand => {
+                    error!("Unknown command: '{}'", order.command_name);
+                    return format!("Unknown command: '{}'", order.command_name);
+                }
+            },
         };
 
         if let Err(e) = self.execute_command(cmd) {
             match e {
                 SoundPlayerError::PlayError { file, source } => {
                     error!("Failed to play '{}': {}", file, source);
+                    return format!("Failed to play '{}': {}", file, source);
                 }
                 SoundPlayerError::SeekError { position, source } => {
                     error!("Failed to seek to {}: {}", position, source);
+                    return format!("Failed to seek to {}: {}", position, source);
                 }
                 SoundPlayerError::InvalidVolume { volume } => {
                     warn!("Invalid volume: {}", volume);
+                    return format!("Invalid volume: {}", volume);
                 }
                 SoundPlayerError::InvalidSpeed { speed } => {
                     warn!("Invalid speed: {}", speed);
+                    return format!("Invalid speed: {}", speed);
                 }
                 SoundPlayerError::NoSongLoaded => {
                     warn!("No song is currently loaded.");
+                    return format!("No song is currently loaded.");
                 }
                 SoundPlayerError::InvalidStreamHandle => {
                     error!("Stream handle is no longer valid.");
+                    return format!("Stream handle is no longer valid.");
                 }
                 SoundPlayerError::StreamError(source) => {
-                    error!("Audio stream error: {}", source);
+                    return format!("Audio stream error: {}", source);
                 }
                 SoundPlayerError::FileOpenError { file, source } => {
                     error!("Failed to open file '{}': {}", file, source);
+                    return format!("Failed to open file '{}': {}", file, source);
                 }
                 SoundPlayerError::DecodingError { file, source } => {
                     error!("Failed to decode file '{}': {}", file, source);
+                    return format!("Failed to decode file '{}': {}", file, source);
                 }
             }
         } else {
-            info!("Command '{}' executed successfully", command_str);
+            info!(
+                "Command '{}' with params '{}' executed successfully",
+                order.command_name,
+                order.parameters.join(" ")
+            );
+            return format!(
+                "Command '{}' with params '{}' executed successfully",
+                order.command_name,
+                order.parameters.join(" ")
+            );
         }
     }
 }
